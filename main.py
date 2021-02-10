@@ -6,7 +6,7 @@ from pprint import pprint
 import requests
 import tweepy
 
-
+# Abfrage des 3D Druckers nach aktuellem Status als Generator (weil ich Lust dazu hatte :P)
 def get_printer_status():
     url = "http://192.168.1.14/printer/list/"
 
@@ -27,6 +27,7 @@ def get_printer_status():
 
 
 if __name__ == '__main__':
+    # Lokale Datenbank zum Speichern der Posts/Druckids
     conn = sqlite3.connect("infos.db")
     with conn as db:
         db.execute("""CREATE TABLE IF NOT EXISTS "repetier_infos" (
@@ -49,34 +50,45 @@ if __name__ == '__main__':
         ;
         """)
 
+    # Twitter API Schlüssel
     consumer_key = "zarMTv7kAtOKPyHQzdXU5uPI7"
     consumer_secret = "2AfimBG5KN2JoK4fr6mzBwTak1yabDcm4e43L156P6ipjMTaZc"
 
     key = "1353106843963432965-kbI8evj4LWDfic4o5HEk6usTgCPrS2"
     secret = "A2SJIqGbyOaCo8MFQxaU36JMilnOm6GK0OzKbbsDER6o3"
 
+    # Homeassistant Schlüssel (Licht steuerung)
     ha_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiI1ZTFkNTg5ZGY5Njg0MjAzYTM5NjQ2NTI2YjI2OWU4YyIsImlhdCI6MTYxMTUyODQ5MiwiZXhwIjoxOTI2ODg4NDkyfQ.Yjn3sLXxl1m3fU8us2oiLx6VxCEh5iW8UeNs42u8MAg"
 
+    # Initialisierung
     ps = get_printer_status()
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(key, secret)
     api = tweepy.API(auth, wait_on_rate_limit=True)
 
+    # Checkloop
     while True:
         d = next(ps)
+        # Hole den aktiven Job/letzten Tweet aus der Datenbank (wird weiter unten geschrieben)
         with conn as db:
             data = db.execute(
                 "SELECT r.jobid, t.id FROM repetier_infos r LEFT JOIN tweets t ON r.jobid = t.repetier_id WHERE r.active = 1;")
             active_job, active_tweet = data.fetchone() or (None, None)
 
         if d['data']['job'] != "none" and d['data']['printTime'] > 7200:
+            # Es existiert ein Druckauftrag, der länger als 2 Stunden dauert
+
+            # Trage den Druckauftrag als aktiv in die Datenbank ein
             with conn as db:
                 db.execute("REPLACE INTO repetier_infos (jobid, job, printStart, job_time, active) VALUES"
                            f"({d['data']['jobid']}, '{d['data']['job']}', '{datetime.fromtimestamp(d['data']['printStart']).isoformat()}', {int(d['data']['printTime'])}, 1)")
+            # Speichere das vorgerenderte Bild (wird vom Druckserver zur verfügung gestellt)
             with open("tmp.jpg", "wb") as f:
                 f.write(d['prev'])
             if active_tweet is None and d['data']['analysed'] == 1:
+                # Es gibt noch keinen Tweet zu dem Druck
 
+                # ETE berechnen
                 seconds = int(d['data']['printTime'])
 
                 hours = int(seconds / (60 * 60))
@@ -84,16 +96,22 @@ if __name__ == '__main__':
 
                 ete = f"{hours}:{minutes}"
 
+                # Tweet mit ETE und Bild im Anhang posten
                 tweet = api.update_with_media(f"{d['data']['jobid']}.jpg", file=open("tmp.jpg", "rb"),
                                               status=f"Ein weiterer #3ddruck läuft ... ~{ete} Std.")
+                
+                # Tweet ID in der Datenbank speichern
                 tweet: tweepy.Status
                 with conn as db:
                     db.execute("REPLACE INTO tweets (id, repetier_id) VALUES"
                                f"('{tweet.id}', {d['data']['jobid']})")
 
-        #         time.sleep(max((d['data']['printTime'] - d['data']['printedTimeComp']) * 0.7, 5))
         else:
+            # Es existiert kein aktiver Druckauftrag
             if active_job is not None:
+                # In der Datenbank gab es noch einen aktiven Auftrag -> der Druck ist abgeschlossen
+
+                # Home Assistant das Licht im Raum anschalten lassen
                 url = "http://192.168.1.127:8123/api/services/light/turn_on"
 
                 payload="{\"entity_id\":\"light.computerraum\", \"brightness\": 255, \"kelvin\":4000}"
@@ -106,15 +124,19 @@ if __name__ == '__main__':
 
                 time.sleep(3)
 
-                
+                # Bild von Druck aufnehmen und zwischenspeichern                
                 d = next(ps)
 
                 with open("tmp.jpg", "wb") as f:
                     f.write(d['img'])
+
+                # Bild des fertigen Drucks auf Twitter posten
                 api.update_with_media(f"{active_job}_done.jpg", file=open("tmp.jpg", "rb"),
                                       status=f"Und so sieht's aus",
                                       in_reply_to_status_id=active_tweet)
 
+                # Licht wieder ausschalten
+                # TODO: Statusabfrage des Lichts und zustand wiederherstellen
                 url = "http://192.168.1.127:8123/api/services/light/turn_off"
 
                 payload="{\"entity_id\":\"light.computerraum\"}"
@@ -125,6 +147,8 @@ if __name__ == '__main__':
 
                 requests.request("POST", url, headers=headers, data=payload)
 
+                # Alle in der Datenbank als aktiv markierte Jobs als inaktiv kennzeichnen
                 with conn as db:
                     db.execute(f"UPDATE repetier_infos SET active=0 WHERE jobid = {active_job};")
+        # Delay zwischen den Checks
         time.sleep(60)
