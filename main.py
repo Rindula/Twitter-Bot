@@ -53,11 +53,11 @@ if __name__ == '__main__':
         """)
 
     # Twitter API Schlüssel
-    consumer_key = secrets.twitter['consumer_key']
-    consumer_secret = secrets.twitter['consumer_secret']
+    consumer_key = secrets.twitter_keys['consumer_key']
+    consumer_secret = secrets.twitter_keys['consumer_secret']
 
-    key = secrets.twitter['key']
-    secret = secrets.twitter['secret']
+    key = secrets.twitter_keys['key']
+    secret = secrets.twitter_keys['secret']
 
     # Homeassistant Schlüssel (Licht steuerung)
     ha_token = secrets.home_assistant_key
