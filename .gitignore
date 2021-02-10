@@ -1,3 +1,4 @@
 /venv/
 /infos.db
 /tmp.jpg
+secrets.py

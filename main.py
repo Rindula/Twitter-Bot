@@ -6,13 +6,15 @@ from pprint import pprint
 import requests
 import tweepy
 
+import secrets
+
 # Abfrage des 3D Druckers nach aktuellem Status als Generator (weil ich Lust dazu hatte :P)
 def get_printer_status():
     url = "http://192.168.1.14/printer/list/"
 
     payload = {}
     headers = {
-        'x-api-key': '54294070-6761-4fb9-8937-1ba1bd8094e2'
+        'x-api-key': secrets.repetier_key
     }
     while True:
         response = requests.request("GET", url, headers=headers, data=payload).json()['data'][0]
@@ -51,14 +53,14 @@ if __name__ == '__main__':
         """)
 
     # Twitter API Schlüssel
-    consumer_key = "zarMTv7kAtOKPyHQzdXU5uPI7"
-    consumer_secret = "2AfimBG5KN2JoK4fr6mzBwTak1yabDcm4e43L156P6ipjMTaZc"
+    consumer_key = secrets.twitter['consumer_key']
+    consumer_secret = secrets.twitter['consumer_secret']
 
-    key = "1353106843963432965-kbI8evj4LWDfic4o5HEk6usTgCPrS2"
-    secret = "A2SJIqGbyOaCo8MFQxaU36JMilnOm6GK0OzKbbsDER6o3"
+    key = secrets.twitter['key']
+    secret = secrets.twitter['secret']
 
     # Homeassistant Schlüssel (Licht steuerung)
-    ha_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiI1ZTFkNTg5ZGY5Njg0MjAzYTM5NjQ2NTI2YjI2OWU4YyIsImlhdCI6MTYxMTUyODQ5MiwiZXhwIjoxOTI2ODg4NDkyfQ.Yjn3sLXxl1m3fU8us2oiLx6VxCEh5iW8UeNs42u8MAg"
+    ha_token = secrets.home_assistant_key
 
     # Initialisierung
     ps = get_printer_status()
