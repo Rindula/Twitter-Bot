@@ -19,7 +19,6 @@ def get_printer_status():
     while True:
         response = requests.request("GET", url, headers=headers, data=payload).json()['data'][0]
         img = requests.get("http://192.168.1.14:8080/?action=snapshot")
-        print(response)
         if response['job'] != "none":
             prev = requests.get(
                 f"http://192.168.1.14/dyn/render_image?q=jobs&id={response['jobid']}&slug=Ender_3_Pro&t=m&tm={round(time.time())}")
