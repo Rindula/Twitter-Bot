@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 hours = int(seconds / (60 * 60))
                 minutes = int(seconds / 60 - 60 * hours)
 
-                ete = f"{hours}:{minutes}"
+                ete = f"{hours}:{minutes:02d}"
 
                 # Tweet mit ETE und Bild im Anhang posten
                 tweet = api.update_with_media(f"{d['data']['jobid']}.jpg", file=open("tmp.jpg", "rb"),
